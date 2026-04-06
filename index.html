@@ -1,0 +1,1647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>IILM Research Dashboard | AI CoE · SCSE Gurugram</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/recharts/2.5.0/Recharts.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body { font-family: 'Inter', system-ui, sans-serif; background: #EEF2F8; color: #1e293b; -webkit-font-smoothing: antialiased; }
+  input, select, textarea, button { font-family: inherit; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: #0B1F4B !important; box-shadow: 0 0 0 3px rgba(11,31,75,0.14) !important; }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: #f1f5f9; }
+  ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 4px; }
+  .rh:hover { background: #f4f8ff !important; transition: background 0.12s; }
+  @keyframes fadeUp   { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:none; } }
+  @keyframes spin     { to   { transform: rotate(360deg); } }
+  @keyframes pulse    { 0%,100%{opacity:1} 50%{opacity:.4} }
+  .fadeUp { animation: fadeUp 0.28s ease forwards; }
+  .spin   { display:inline-block; animation: spin 0.7s linear infinite; }
+  .pulse  { animation: pulse 1.4s ease infinite; }
+  a { text-decoration: none; }
+</style>
+</head>
+<body>
+
+<!-- Loading splash shown before React boots -->
+<div id="root">
+  <div style="display:flex;align-items:center;justify-content:center;height:100vh;
+    background:linear-gradient(135deg,#071337 0%,#0B1F4B 60%,#1a3a6b 100%)">
+    <div style="color:#fff;text-align:center">
+      <div style="font-size:60px;margin-bottom:16px">🎓</div>
+      <div style="font-size:20px;font-weight:900;letter-spacing:.06em">IILM RESEARCH DASHBOARD</div>
+      <div style="margin-top:8px;opacity:.4;font-size:13px" class="pulse">Initialising…</div>
+    </div>
+  </div>
+</div>
+
+<script type="text/babel">
+
+// ╔══════════════════════════════════════════════════════════════════════╗
+// ║  ⚙️  PASTE YOUR APPS SCRIPT WEB APP URL BELOW                        ║
+// ╚══════════════════════════════════════════════════════════════════════╝
+const API_URL = 'https://script.google.com/a/macros/iilm.edu/s/AKfycbzwRT2KqO2X8Eew1Mni5xy0cC1UAQsHaMc65_WdG7kS3bOqvYLebjADsaU82GaNEaSe/exec';
+// ════════════════════════════════════════════════════════════════════════
+
+const { useState, useEffect, useRef, Fragment, useCallback } = React;
+const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+        LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer } = Recharts;
+
+// ── THEME ─────────────────────────────────────────────────────────────────
+const C = {
+  navy:'#0B1F4B', dk:'#071337', navy2:'#0e2d6b',
+  gold:'#C9A62A', goldLt:'#FDF3C4',
+  red:'#C0392B',  green:'#1A7F5A',
+  bg:'#EEF2F8', bgCard:'#FFFFFF', border:'#D8E0EF',
+  muted:'#64748B', text:'#1e293b',
+};
+
+// ── CONSTANTS ─────────────────────────────────────────────────────────────
+const SCHOOLS = [
+  'School of Computer Science & Engineering','School of Management',
+  'School of Law','School of Media Studies','School of Liberal Arts',
+  'School of Psychology','School of Design & Innovation','Other',
+];
+
+const CATS = [
+  {id:'journal',      label:'Journal Paper',   emoji:'📄', color:'#0B1F4B'},
+  {id:'conference',   label:'Conference Paper', emoji:'🎤', color:'#6D28D9'},
+  {id:'bookChapter',  label:'Book Chapter',     emoji:'📖', color:'#0D7A5A'},
+  {id:'editedBook',   label:'Edited Book',      emoji:'📚', color:'#B45309'},
+  {id:'authoredBook', label:'Authored Book',    emoji:'✍️',  color:'#0369A1'},
+  {id:'patent',       label:'Patent',           emoji:'💡', color:'#B91C1C'},
+  {id:'copyright',    label:'Copyright',        emoji:'©️',  color:'#166534'},
+  {id:'fundedProject',label:'Funded Project',   emoji:'💰', color:'#C2410C'},
+  {id:'design',       label:'Design',           emoji:'🎨', color:'#7C3AED'},
+];
+
+const IDX = ['SCI','SCIE','WOS','Scopus','UGC-CARE','ABDC','Other'];
+
+const FIELDS = {
+  journal:[
+    {n:'title',       l:'Paper Title',              req:1},
+    {n:'journalName', l:'Journal Name',             req:1},
+    {n:'publishDate', l:'Publishing Date',          type:'date',req:1},
+    {n:'indexing',    l:'Indexing',                 type:'sel',opts:IDX,req:1},
+    {n:'authorPos',   l:'Author Position',          ph:'1st / Corresponding / 2nd…'},
+    {n:'doi',         l:'DOI'},
+    {n:'issn',        l:'ISSN'},
+    {n:'coAuthors',   l:'Other IILM Co-Authors'},
+    {n:'publisher',   l:'Publisher Name'},
+    {n:'driveLink',   l:'Google Drive Link (Proof)'},
+  ],
+  conference:[
+    {n:'title',         l:'Paper Title',         req:1},
+    {n:'conferenceName',l:'Conference Name',      req:1},
+    {n:'venue',         l:'Venue'},
+    {n:'confDate',      l:'Conference Date',      type:'date'},
+    {n:'publishDate',   l:'Publishing Date',      type:'date',req:1},
+    {n:'doi',           l:'DOI'},
+    {n:'isbnIssn',      l:'ISBN / ISSN'},
+    {n:'coAuthors',     l:'Other IILM Co-Authors'},
+    {n:'publisher',     l:'Publisher'},
+    {n:'indexing',      l:'Indexing',             type:'sel',opts:IDX},
+    {n:'driveLink',     l:'Google Drive Link (Proof)'},
+  ],
+  bookChapter:[
+    {n:'title',      l:'Chapter Title',   req:1},
+    {n:'bookName',   l:'Book Name',       req:1},
+    {n:'publishDate',l:'Publishing Date', type:'date',req:1},
+    {n:'doi',l:'DOI'},{n:'isbnIssn',l:'ISBN / ISSN'},
+    {n:'coAuthors',l:'Other IILM Co-Authors'},{n:'publisher',l:'Publisher'},
+    {n:'indexing',l:'Indexing',type:'sel',opts:IDX},
+    {n:'driveLink',l:'Google Drive Link (Proof)'},
+  ],
+  editedBook:[
+    {n:'title',l:'Book Name',req:1},{n:'publishDate',l:'Publishing Date',type:'date',req:1},
+    {n:'doi',l:'DOI'},{n:'isbnIssn',l:'ISBN / ISSN'},
+    {n:'coAuthors',l:'Other IILM Co-Authors'},{n:'publisher',l:'Publisher'},
+    {n:'indexing',l:'Indexing',type:'sel',opts:IDX},
+    {n:'driveLink',l:'Google Drive Link (Proof)'},
+  ],
+  authoredBook:[
+    {n:'title',l:'Book Name',req:1},{n:'publishDate',l:'Publishing Date',type:'date',req:1},
+    {n:'doi',l:'DOI'},{n:'isbnIssn',l:'ISBN / ISSN'},
+    {n:'coAuthors',l:'Other IILM Co-Authors'},{n:'publisher',l:'Publisher'},
+    {n:'indexing',l:'Indexing',type:'sel',opts:IDX},
+    {n:'driveLink',l:'Google Drive Link (Proof)'},
+  ],
+  patent:[
+    {n:'title',      l:'Patent Title',   req:1},
+    {n:'country',    l:'Country',        req:1},
+    {n:'filingDate', l:'Filing Date',    type:'date',req:1},
+    {n:'publishDate',l:'Publish Date',   type:'date'},
+    {n:'status',     l:'Status',         type:'sel',opts:['Filed','Published','Granted']},
+    {n:'applicant',  l:'Applicant Name'},
+    {n:'patentNo',   l:'Patent No'},
+    {n:'driveLink',  l:'Google Drive Link (Proof)'},
+  ],
+  copyright:[
+    {n:'title',   l:'Copyright Title',      req:1},
+    {n:'country', l:'Country',              req:1},
+    {n:'filingDate',l:'Filing Date',        type:'date',req:1},
+    {n:'regDate',   l:'Registration Date',  type:'date'},
+    {n:'status',    l:'Status',             type:'sel',opts:['Filed','Registered']},
+    {n:'regNo',     l:'Registration No'},
+    {n:'driveLink', l:'Google Drive Link (Proof)'},
+  ],
+  fundedProject:[
+    {n:'title',         l:'Project Title',    req:1},
+    {n:'fundingAgency', l:'Funding Agency',   req:1},
+    {n:'amount',        l:'Amount (₹)',        type:'number'},
+    {n:'submissionDate',l:'Submission Date',  type:'date'},
+    {n:'grantDate',     l:'Grant Date',       type:'date'},
+    {n:'duration',      l:'Duration',         ph:'e.g. 2 Years'},
+    {n:'role',          l:'Role',             type:'sel',opts:['PI','CO-PI']},
+    {n:'status',        l:'Status',           type:'sel',opts:['Submitted','Granted','Ongoing','Completed']},
+    {n:'fundingNo',     l:'Funding Number'},
+    {n:'driveLink',     l:'Google Drive Link (Proof)'},
+  ],
+  design:[
+    {n:'title',    l:'Design Detail',       req:1},
+    {n:'country',  l:'Country',             req:1},
+    {n:'filingDate',l:'Filing Date',        type:'date',req:1},
+    {n:'regDate',   l:'Registration Date',  type:'date'},
+    {n:'status',    l:'Status',             type:'sel',opts:['Filed','Registered']},
+    {n:'regNo',     l:'Registration No'},
+    {n:'driveLink', l:'Google Drive Link (Proof)'},
+  ],
+};
+
+const RLBL = {user:'Faculty',schoolHead:'School Head',
+              universityHead:'University Head',admin:'Administrator'};
+const PALETTE = ['#0B1F4B','#B91C1C','#D97706','#059669','#7C3AED',
+                 '#0891B2','#9D174D','#065F46','#1D4ED8'];
+
+// ── API ───────────────────────────────────────────────────────────────────
+async function api(action, payload={}) {
+  if (API_URL === 'PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE')
+    throw new Error('⚠️ Apps Script URL not configured. Open index.html and set API_URL.');
+  const res = await fetch(API_URL, {
+    method:'POST', redirect:'follow',
+    headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body: JSON.stringify({action, ...payload}),
+  });
+  if (!res.ok) throw new Error(`Network error: HTTP ${res.status}`);
+  const json = await res.json();
+  if (json.error) throw new Error(json.error);
+  return json;
+}
+
+// ── STYLE ATOMS ───────────────────────────────────────────────────────────
+const Inp = (extra={}) => ({
+  width:'100%', padding:'9px 13px', border:`1.5px solid ${C.border}`,
+  borderRadius:8, fontSize:13.5, background:'#fff', color:C.text,
+  transition:'border-color .15s, box-shadow .15s', ...extra,
+});
+const Btn = (bg=C.navy, fg='#fff', extra={}) => ({
+  background:bg, color:fg, border:'none', borderRadius:8,
+  padding:'9px 18px', cursor:'pointer', fontWeight:700, fontSize:13.5,
+  display:'inline-flex', alignItems:'center', gap:6,
+  transition:'opacity .15s, transform .1s', ...extra,
+});
+const Card = (extra={}) => ({
+  background:'#fff', borderRadius:14, padding:22,
+  boxShadow:'0 2px 14px rgba(11,31,75,0.08)', ...extra,
+});
+const Lbl = { display:'block', fontSize:11.5, fontWeight:700, color:'#374151',
+  marginBottom:5, letterSpacing:'.05em', textTransform:'uppercase' };
+
+// ── UTILS ─────────────────────────────────────────────────────────────────
+const catOf = id => CATS.find(c=>c.id===id) || {label:id,emoji:'📎',color:C.navy};
+
+function exportCSV(rows, fname) {
+  if (!rows.length) { alert('No data to export.'); return; }
+  const keys = [...new Set(rows.flatMap(r=>Object.keys(r)))];
+  const csv  = [keys.join(','), ...rows.map(r=>
+    keys.map(k=>`"${String(r[k]||'').replace(/"/g,'""')}"`).join(',')
+  )].join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download = fname; a.click();
+}
+
+function buildExportRows(recs) {
+  return recs.map(r=>({
+    Type:catOf(r.type).label, Author:r.authorName, Email:r.authorEmail,
+    School:r.school, Designation:r.designation,
+    ApprovalStatus:r.approvalStatus, ApprovedBy:r.approvedBy||'',
+    SubmittedDate:r.createdAt?.slice(0,10), ...r.data,
+  }));
+}
+
+function dedup(recs) {
+  const seen=new Set();
+  return recs.filter(r=>{
+    const k = r.data?.doi || (r.type+'::'+r.data?.title?.toLowerCase()?.trim());
+    if(!k||seen.has(k)) return false;
+    seen.add(k); return true;
+  });
+}
+
+// ── MINI COMPONENTS ──────────────────────────────────────────────────────
+const Spin = () => <span className="spin">⏳</span>;
+
+const Empty = ({msg, sub}) => (
+  <div style={{textAlign:'center',padding:'48px 20px',color:C.muted}}>
+    <div style={{fontSize:42,marginBottom:10}}>📭</div>
+    <div style={{fontSize:14,fontWeight:600}}>{msg}</div>
+    {sub && <div style={{fontSize:12,marginTop:4,opacity:.7}}>{sub}</div>}
+  </div>
+);
+
+const StatusBadge = ({s}) => {
+  const m = {approved:{bg:'#D1FAE5',fg:'#065F46',l:'✅ Approved'},
+             rejected:{bg:'#FEE2E2',fg:'#991B1B',l:'❌ Rejected'},
+             pending: {bg:'#FEF3C7',fg:'#92400E',l:'⏳ Pending'}}[s]
+          || {bg:'#F1F5F9',fg:C.muted,l:s||'—'};
+  return <span style={{padding:'3px 10px',borderRadius:12,fontSize:11.5,
+    fontWeight:700,background:m.bg,color:m.fg,whiteSpace:'nowrap'}}>{m.l}</span>;
+};
+
+const SetupBanner = () => (
+  API_URL==='PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE' ? (
+    <div style={{background:'#FFF7ED',borderBottom:'2px solid #F59E0B',
+      padding:'11px 24px',fontSize:13,color:'#92400E',fontWeight:600,
+      display:'flex',alignItems:'center',gap:8}}>
+      ⚠️ <strong>Setup Required:</strong>&nbsp;
+      Open <code style={{background:'#FEF3C7',padding:'1px 5px',borderRadius:4}}>index.html</code>
+      &nbsp;and replace <code style={{background:'#FEF3C7',padding:'1px 5px',borderRadius:4}}>PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE</code>
+      &nbsp;with your deployed Apps Script URL.
+    </div>
+  ) : null
+);
+
+// ══════════════════════════════════════════════════════════════════════════
+//  ROOT APP
+// ══════════════════════════════════════════════════════════════════════════
+function App() {
+  const [loading, setLoading] = useState(true);
+  const [user,    setUser]    = useState(null);
+  const [recs,    setRecs]    = useState([]);
+  const [users,   setUsers]   = useState([]);
+  const [page,    setPage]    = useState('dashboard');
+  const [toast,   setToast]   = useState(null);
+  const toastTimer = useRef(null);
+
+  const notify = useCallback((msg, type='ok') => {
+    clearTimeout(toastTimer.current);
+    setToast({msg,type});
+    toastTimer.current = setTimeout(()=>setToast(null), 3600);
+  },[]);
+
+  // Restore session
+  useEffect(()=>{
+    (async()=>{
+      try {
+        const saved = localStorage.getItem('iilm_sess');
+        if (saved) {
+          const u = JSON.parse(saved);
+          setUser(u);
+          const [rr, ur] = await Promise.all([
+            api('getRecords',{userId:u.id}),
+            ['admin','universityHead','schoolHead'].includes(u.role)
+              ? api('getUsers',{userId:u.id}) : Promise.resolve({users:[]}),
+          ]);
+          if (rr.success) setRecs(rr.records);
+          if (ur.success) setUsers(ur.users);
+        }
+      } catch(err) {
+        localStorage.removeItem('iilm_sess');
+        if (err.message.includes('Session invalid')) { setUser(null); }
+      }
+      setLoading(false);
+    })();
+  },[]);
+
+  const doLogin = async u => {
+    setUser(u);
+    localStorage.setItem('iilm_sess', JSON.stringify(u));
+    const [rr,ur] = await Promise.all([
+      api('getRecords',{userId:u.id}),
+      ['admin','universityHead','schoolHead'].includes(u.role)
+        ? api('getUsers',{userId:u.id}) : Promise.resolve({users:[]}),
+    ]);
+    if (rr.success) setRecs(rr.records);
+    if (ur.success) setUsers(ur.users);
+  };
+
+  const logout = () => {
+    setUser(null); setRecs([]); setUsers([]);
+    localStorage.removeItem('iilm_sess');
+    setPage('dashboard');
+    notify('Logged out successfully.');
+  };
+
+  const refreshRecs = async () => {
+    if (!user) return;
+    try {
+      const r = await api('getRecords',{userId:user.id});
+      if (r.success) setRecs(r.records);
+    } catch(e) { notify(e.message,'err'); }
+  };
+
+  const refreshUsers = async () => {
+    if (!user) return;
+    try {
+      const r = await api('getUsers',{userId:user.id});
+      if (r.success) setUsers(r.users);
+    } catch(e) {}
+  };
+
+  if (loading) return (
+    <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',
+      background:`linear-gradient(135deg,${C.dk},${C.navy})`}}>
+      <div style={{color:'#fff',textAlign:'center'}}>
+        <div style={{fontSize:60,marginBottom:16}}>🎓</div>
+        <div style={{fontSize:20,fontWeight:900,letterSpacing:'.06em'}}>IILM RESEARCH DASHBOARD</div>
+        <div style={{marginTop:8,opacity:.4,fontSize:13}} className="pulse">Restoring session…</div>
+      </div>
+    </div>
+  );
+
+  const ctx = {user,users,recs,setRecs,setUsers,notify,refreshRecs,refreshUsers};
+
+  return (
+    <div>
+      <SetupBanner/>
+      {/* TOAST */}
+      {toast && (
+        <div style={{position:'fixed',top:18,right:18,zIndex:9999,
+          background:toast.type==='err'?C.red:'#166534',color:'#fff',
+          padding:'12px 20px',borderRadius:10,fontSize:13.5,fontWeight:600,
+          boxShadow:'0 6px 30px rgba(0,0,0,0.25)',animation:'fadeUp .25s ease',maxWidth:360,
+          borderLeft:`4px solid ${toast.type==='err'?'#7f1d1d':'#052e16'}`}}>
+          {toast.type==='err'?'❌ ':'✅ '}{toast.msg}
+        </div>
+      )}
+      {!user
+        ? <AuthPage doLogin={doLogin} notify={notify}/>
+        : <Shell {...ctx} page={page} setPage={setPage} logout={logout}/>
+      }
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//  AUTH PAGE
+// ══════════════════════════════════════════════════════════════════════════
+function AuthPage({doLogin, notify}) {
+  const [tab,  setTab]  = useState('login');
+  const [form, setForm] = useState({});
+  const [err,  setErr]  = useState('');
+  const [busy, setBusy] = useState(false);
+  const upd = (k,v) => setForm(f=>({...f,[k]:v}));
+
+  const signIn = async () => {
+    if (!form.email||!form.password) return setErr('Enter your email and password.');
+    setBusy(true); setErr('');
+    try {
+      const r = await api('login',{email:form.email,password:form.password});
+      await doLogin(r.user);
+      notify(`Welcome back, ${r.user.name.split(' ')[0]}!`);
+    } catch(e) { setErr(e.message); setBusy(false); }
+  };
+
+  const register = async () => {
+    if (!(form.email||'').toLowerCase().endsWith('@iilm.edu'))
+      return setErr('Only @iilm.edu email addresses are permitted.');
+    if (!form.name||!form.password||!form.school||!form.designation||!form.employeeCode)
+      return setErr('Please fill all required fields (marked *).');
+    if (form.password.length < 6)
+      return setErr('Password must be at least 6 characters.');
+    setBusy(true); setErr('');
+    try {
+      const r = await api('register', form);
+      await doLogin(r.user);
+      notify(`Account created! Welcome, ${r.user.name.split(' ')[0]}!`);
+    } catch(e) { setErr(e.message); setBusy(false); }
+  };
+
+  return (
+    <div style={{minHeight:'100vh',display:'flex',
+      background:`linear-gradient(150deg,${C.dk} 0%,${C.navy} 55%,#1a3a6b 100%)`}}>
+
+      {/* ── LEFT BRAND PANEL ── */}
+      <div style={{flex:'0 0 400px',display:'flex',flexDirection:'column',
+        justifyContent:'center',padding:'60px 48px',color:'#fff',
+        borderRight:'1px solid rgba(255,255,255,0.07)'}}>
+        <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:28}}>
+          <div style={{fontSize:52}}>🎓</div>
+          <div>
+            <div style={{fontSize:10.5,fontWeight:800,letterSpacing:'.22em',
+              color:C.gold,textTransform:'uppercase',marginBottom:4}}>
+              AI Center of Excellence
+            </div>
+            <h1 style={{fontSize:26,fontWeight:900,lineHeight:1.2}}>
+              IILM Research<br/>Dashboard
+            </h1>
+          </div>
+        </div>
+        <p style={{fontSize:13,opacity:.55,lineHeight:1.7,marginBottom:32}}>
+          School of Computer Science &amp; Engineering, Gurugram.<br/>
+          Centralised research tracking for all IILM faculty.
+        </p>
+        {[
+          ['📄','Track Journal & Conference Papers'],
+          ['💡','Patents, Copyrights & Designs'],
+          ['💰','Funded Projects & Grants'],
+          ['📊','Analytics, Reports & Approvals'],
+          ['🔐','Role-based Access — Faculty / Head / Admin'],
+        ].map(([i,t])=>(
+          <div key={t} style={{display:'flex',alignItems:'center',gap:10,
+            fontSize:12.5,opacity:.78,marginBottom:8}}>
+            <span style={{width:20,flexShrink:0}}>{i}</span><span>{t}</span>
+          </div>
+        ))}
+        <div style={{marginTop:'auto',paddingTop:28,
+          borderTop:'1px solid rgba(255,255,255,0.08)',
+          fontSize:11,opacity:.3,lineHeight:1.6}}>
+          Data stored in Google Sheets on phd.scse.ggn@iilm.edu<br/>
+          Powered by Apps Script · No keys exposed
+        </div>
+      </div>
+
+      {/* ── RIGHT FORM PANEL ── */}
+      <div style={{flex:1,display:'flex',alignItems:'center',
+        justifyContent:'center',padding:32}}>
+        <div style={{width:'100%',maxWidth:520,background:'#fff',borderRadius:20,
+          padding:'38px 42px',boxShadow:'0 28px 90px rgba(0,0,0,0.34)'}}>
+
+          {/* Tabs */}
+          <div style={{display:'flex',borderBottom:`2px solid ${C.border}`,marginBottom:28}}>
+            {['login','register'].map(t=>(
+              <button key={t} onClick={()=>{setTab(t);setErr('');setForm({});}}
+                style={{flex:1,padding:'10px 0',border:'none',background:'none',
+                  cursor:'pointer',fontWeight:700,fontSize:14.5,marginBottom:-2,
+                  borderBottom:tab===t?`3px solid ${C.navy}`:'3px solid transparent',
+                  color:tab===t?C.navy:C.muted}}>
+                {t==='login'?'🔐 Sign In':'📝 Register'}
+              </button>
+            ))}
+          </div>
+
+          {err && (
+            <div style={{background:'#FEF2F2',color:C.red,padding:'10px 14px',
+              borderRadius:8,fontSize:13,marginBottom:18,
+              borderLeft:`3px solid ${C.red}`,lineHeight:1.5}}>
+              ⚠️ {err}
+            </div>
+          )}
+
+          {tab==='login' ? (
+            <div>
+              {[{l:'Official Email ID',k:'email',type:'email',ph:'yourname@iilm.edu'},
+                {l:'Password',         k:'password',type:'password',ph:'••••••••'}]
+              .map(f=>(
+                <div key={f.k} style={{marginBottom:18}}>
+                  <label style={Lbl}>{f.l}</label>
+                  <input style={Inp()} type={f.type} placeholder={f.ph}
+                    value={form[f.k]||''} onChange={e=>upd(f.k,e.target.value)}
+                    onKeyDown={e=>e.key==='Enter'&&!busy&&signIn()}/>
+                </div>
+              ))}
+              <button style={{...Btn(C.navy,'#fff',{width:'100%',padding:'13px',
+                fontSize:15,justifyContent:'center',marginTop:4})}}
+                onClick={signIn} disabled={busy}>
+                {busy?<><Spin/>&nbsp;Signing in…</>:'Sign In →'}
+              </button>
+              <div style={{marginTop:16,padding:'11px 14px',background:C.bg,
+                borderRadius:8,fontSize:12,color:C.muted,lineHeight:1.6}}>
+                <strong style={{color:C.navy}}>Default Admin:</strong>&nbsp;
+                admin@iilm.edu &nbsp;/&nbsp; Admin@123
+              </div>
+            </div>
+          ) : (
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+              {[
+                {l:'Full Name *',             k:'name',         full:1, ph:'Dr. / Prof. Full Name'},
+                {l:'Official Email * (@iilm.edu)',k:'email',    full:1, type:'email', ph:'name@iilm.edu'},
+                {l:'Password *',              k:'password',     type:'password', ph:'Min 6 characters'},
+                {l:'Employee Code *',         k:'employeeCode', ph:'e.g. SCSE001'},
+                {l:'Designation *',           k:'designation',  ph:'Asst. / Assoc. Professor'},
+                {l:'Mobile No',               k:'mobile',       ph:'+91 XXXXX XXXXX'},
+                {l:'ORCID ID',                k:'orcid',        ph:'0000-0000-0000-0000'},
+                {l:'Google Scholar ID',       k:'googleScholar',ph:'Scholar profile ID'},
+                {l:'Vidwan ID',               k:'vidwan',       ph:'Vidwan profile ID'},
+              ].map(f=>(
+                <div key={f.k} style={{gridColumn:f.full?'1/-1':'auto'}}>
+                  <label style={Lbl}>{f.l}</label>
+                  <input style={Inp()} type={f.type||'text'} placeholder={f.ph||''}
+                    value={form[f.k]||''} onChange={e=>upd(f.k,e.target.value)}/>
+                </div>
+              ))}
+              <div style={{gridColumn:'1/-1'}}>
+                <label style={Lbl}>School *</label>
+                <select style={Inp()} value={form.school||''} onChange={e=>upd('school',e.target.value)}>
+                  <option value=''>Select your school…</option>
+                  {SCHOOLS.map(s=><option key={s}>{s}</option>)}
+                </select>
+              </div>
+              <button style={{...Btn(C.navy,'#fff',{gridColumn:'1/-1',
+                padding:'13px',fontSize:15,justifyContent:'center'})}}
+                onClick={register} disabled={busy}>
+                {busy?<><Spin/>&nbsp;Creating account…</>:'Create Account →'}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//  SHELL
+// ══════════════════════════════════════════════════════════════════════════
+function Shell(props) {
+  const {user,recs,page,setPage,logout} = props;
+  const [col, setCol] = useState(false);
+
+  const canApprove = ['schoolHead','universityHead','admin'].includes(user.role);
+  const canAll     = ['schoolHead','universityHead','admin'].includes(user.role);
+  const isAdmin    = user.role==='admin';
+
+  const pending = recs.filter(r=>{
+    if (r.approvalStatus!=='pending') return false;
+    if (user.role==='admin'||user.role==='universityHead') return true;
+    return user.role==='schoolHead' && r.school===user.school;
+  }).length;
+
+  const NAV = [
+    {id:'dashboard', l:'Dashboard',    icon:'📊'},
+    {id:'addRecord', l:'Add Research', icon:'➕'},
+    {id:'myRecords', l:'My Records',   icon:'📋'},
+    canAll     && {id:'allRecords',l:'All Records',   icon:'🗃️'},
+    {id:'analytics', l:'Analytics',    icon:'📈'},
+    canApprove && {id:'approvals', l:'Approvals',     icon:'✅',badge:pending},
+    isAdmin    && {id:'admin',     l:'Admin Panel',   icon:'⚙️'},
+  ].filter(Boolean);
+
+  return (
+    <div style={{display:'flex',height:'100vh',overflow:'hidden'}}>
+
+      {/* ── SIDEBAR ── */}
+      <div style={{width:col?64:236,background:C.dk,color:'#fff',flexShrink:0,
+        display:'flex',flexDirection:'column',transition:'width .2s ease',
+        overflow:'hidden',borderRight:'1px solid rgba(255,255,255,0.05)'}}>
+
+        {/* Logo */}
+        <div style={{padding:'17px 14px',borderBottom:'1px solid rgba(255,255,255,0.07)',
+          flexShrink:0}}>
+          <div style={{display:'flex',alignItems:'center',gap:9}}>
+            <span style={{fontSize:25,flexShrink:0}}>🎓</span>
+            {!col && (
+              <div>
+                <div style={{fontWeight:800,fontSize:13,letterSpacing:'.02em',
+                  lineHeight:1.2}}>IILM Research</div>
+                <div style={{fontSize:9.5,opacity:.4,marginTop:1}}>AI CoE · SCSE Gurugram</div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Nav */}
+        <nav style={{flex:1,padding:'10px 8px',overflowY:'auto'}}>
+          {NAV.map(n=>(
+            <button key={n.id} onClick={()=>setPage(n.id)}
+              style={{width:'100%',display:'flex',alignItems:'center',gap:9,
+                padding:'9px 10px',borderRadius:9,border:'none',cursor:'pointer',
+                marginBottom:3,textAlign:'left',
+                background:  page===n.id?'rgba(201,166,42,0.18)':'transparent',
+                color:       page===n.id?C.gold:'rgba(255,255,255,0.68)',
+                fontWeight:  page===n.id?700:400,
+                fontSize:    13.5,
+                borderLeft:  page===n.id?`3px solid ${C.gold}`:'3px solid transparent',
+                transition:  'all .13s'}}>
+              <span style={{fontSize:16,flexShrink:0}}>{n.icon}</span>
+              {!col && <span style={{flex:1}}>{n.l}</span>}
+              {!col && n.badge>0 && (
+                <span style={{background:C.red,borderRadius:20,minWidth:20,height:20,
+                  fontSize:11,display:'flex',alignItems:'center',
+                  justifyContent:'center',padding:'0 5px',fontWeight:800}}>
+                  {n.badge}
+                </span>
+              )}
+            </button>
+          ))}
+        </nav>
+
+        {/* Footer */}
+        <div style={{padding:'10px 8px',borderTop:'1px solid rgba(255,255,255,0.07)',flexShrink:0}}>
+          {!col && (
+            <div style={{padding:'9px 10px',background:'rgba(255,255,255,0.06)',
+              borderRadius:8,marginBottom:8,fontSize:12}}>
+              <div style={{fontWeight:700,whiteSpace:'nowrap',overflow:'hidden',
+                textOverflow:'ellipsis'}}>{user.name}</div>
+              <div style={{opacity:.45,marginTop:2,fontSize:10.5}}>{RLBL[user.role]}</div>
+            </div>
+          )}
+          <button onClick={()=>setCol(c=>!c)}
+            style={{...Btn('rgba(255,255,255,0.08)','rgba(255,255,255,0.55)',
+              {width:'100%',marginBottom:6,fontSize:12,padding:'7px',justifyContent:'center'})}}>
+            {col?'▶':'◀ Collapse'}
+          </button>
+          <button onClick={logout}
+            style={{...Btn(C.red,'#fff',{width:'100%',fontSize:12,padding:'7px',justifyContent:'center'})}}>
+            {col?'🚪':'🚪 Logout'}
+          </button>
+        </div>
+      </div>
+
+      {/* ── MAIN ── */}
+      <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+        {/* Topbar */}
+        <div style={{background:'#fff',padding:'12px 24px',
+          borderBottom:`1px solid ${C.border}`,flexShrink:0,
+          display:'flex',alignItems:'center',justifyContent:'space-between',
+          boxShadow:'0 1px 4px rgba(11,31,75,0.05)'}}>
+          <div>
+            <div style={{fontWeight:800,fontSize:16,color:C.navy}}>
+              {NAV.find(n=>n.id===page)?.icon}&nbsp;
+              {NAV.find(n=>n.id===page)?.l||'Dashboard'}
+            </div>
+            <div style={{fontSize:11,color:C.muted,marginTop:1}}>
+              {new Date().toLocaleDateString('en-IN',
+                {weekday:'long',year:'numeric',month:'long',day:'numeric'})}
+            </div>
+          </div>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+            <span style={{background:C.navy+'12',color:C.navy,padding:'4px 13px',
+              borderRadius:20,fontSize:12,fontWeight:700}}>{RLBL[user.role]}</span>
+            <span style={{background:C.gold+'22',color:'#7a5800',padding:'4px 13px',
+              borderRadius:20,fontSize:12,fontWeight:600}}>
+              {user.school?.replace('School of ','')||'—'}
+            </span>
+          </div>
+        </div>
+
+        {/* Page */}
+        <div style={{flex:1,overflowY:'auto',padding:22,background:C.bg}}>
+          {page==='dashboard' && <PageDash   {...props}/>}
+          {page==='addRecord' && <PageAdd    {...props}/>}
+          {page==='myRecords' && <PageRecs   {...props} mode='my'/>}
+          {page==='allRecords'&& canAll && <PageRecs {...props} mode='all'/>}
+          {page==='analytics' && <PageAnaly {...props}/>}
+          {page==='approvals' && canApprove && <PageApprove {...props}/>}
+          {page==='admin'     && isAdmin    && <PageAdmin   {...props}/>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//  DASHBOARD
+// ══════════════════════════════════════════════════════════════════════════
+function PageDash({user,recs}) {
+  const vis = user.role==='user'       ? recs.filter(r=>r.userId===user.id)
+            : user.role==='schoolHead' ? recs.filter(r=>r.school===user.school)
+            : recs;
+
+  const STATS = [
+    {l:'Total Research',    v:vis.length,                                                     i:'📚',c:C.navy},
+    {l:'Journal Papers',    v:vis.filter(r=>r.type==='journal').length,                       i:'📄',c:'#6D28D9'},
+    {l:'Conference Papers', v:vis.filter(r=>r.type==='conference').length,                    i:'🎤',c:'#0369A1'},
+    {l:'Patents',           v:vis.filter(r=>r.type==='patent').length,                        i:'💡',c:C.red},
+    {l:'Funded Projects',   v:vis.filter(r=>r.type==='fundedProject').length,                 i:'💰',c:'#C2410C'},
+    {l:'Approved',          v:vis.filter(r=>r.approvalStatus==='approved').length,            i:'✅',c:C.green},
+  ];
+
+  const catData = CATS.map(c=>({
+    name:c.label.replace(' Paper','').replace('Authored ','').replace('Edited ',''),
+    count:vis.filter(r=>r.type===c.id).length, color:c.color
+  })).filter(d=>d.count>0);
+
+  const yearData = (()=>{
+    const m={};
+    vis.forEach(r=>{ const d=r.data?.publishDate||r.data?.filingDate||r.createdAt;
+      if(d){const y=d.slice(0,4);m[y]=(m[y]||0)+1;} });
+    return Object.entries(m).sort().map(([y,v])=>({year:y,count:v}));
+  })();
+
+  const monthData = (()=>{
+    const m={};
+    vis.forEach(r=>{ const d=r.data?.publishDate||r.data?.filingDate||r.createdAt;
+      if(d){const k=d.slice(0,7);m[k]=(m[k]||0)+1;} });
+    return Object.entries(m).sort().slice(-8).map(([k,v])=>({month:k,count:v}));
+  })();
+
+  return (
+    <div className="fadeUp">
+      <div style={{marginBottom:22}}>
+        <div style={{fontSize:22,fontWeight:900,color:C.navy}}>
+          Welcome back, {user.name.split(' ')[0]}! 👋
+        </div>
+        <div style={{color:C.muted,fontSize:13.5,marginTop:3}}>
+          Here's your research activity overview
+        </div>
+      </div>
+
+      {/* STAT CARDS */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(158px,1fr))',
+        gap:14,marginBottom:22}}>
+        {STATS.map(s=>(
+          <div key={s.l} style={{...Card(),borderTop:`4px solid ${s.c}`}}>
+            <div style={{fontSize:28,marginBottom:6}}>{s.i}</div>
+            <div style={{fontSize:34,fontWeight:900,color:s.c,lineHeight:1}}>{s.v}</div>
+            <div style={{fontSize:12,color:C.muted,marginTop:5,fontWeight:600}}>{s.l}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* CHARTS */}
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:18}}>
+        <div style={Card()}>
+          <div style={{fontWeight:800,color:C.navy,marginBottom:14,fontSize:14}}>
+            📊 Research by Category
+          </div>
+          {catData.length>0 ? (
+            <ResponsiveContainer width='100%' height={210}>
+              <BarChart data={catData} margin={{left:-10}}>
+                <CartesianGrid strokeDasharray='3 3' opacity={0.15}/>
+                <XAxis dataKey='name' tick={{fontSize:10}}/>
+                <YAxis tick={{fontSize:11}}/>
+                <Tooltip/>
+                <Bar dataKey='count' name='Count' radius={[5,5,0,0]}>
+                  {catData.map((d,i)=><Cell key={i} fill={d.color}/>)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          ) : <Empty msg='No records yet' sub='Add your first research entry!'/>}
+        </div>
+
+        <div style={Card()}>
+          <div style={{fontWeight:800,color:C.navy,marginBottom:14,fontSize:14}}>
+            📈 Monthly Submission Trend
+          </div>
+          {monthData.length>0 ? (
+            <ResponsiveContainer width='100%' height={210}>
+              <LineChart data={monthData} margin={{left:-10}}>
+                <CartesianGrid strokeDasharray='3 3' opacity={0.15}/>
+                <XAxis dataKey='month' tick={{fontSize:10}}/>
+                <YAxis tick={{fontSize:11}}/>
+                <Tooltip/>
+                <Line type='monotone' dataKey='count' stroke={C.gold} strokeWidth={2.5}
+                  dot={{r:4,fill:C.navy,strokeWidth:2,stroke:C.gold}} name='Submissions'/>
+              </LineChart>
+            </ResponsiveContainer>
+          ) : <Empty msg='No trend data yet'/>}
+        </div>
+      </div>
+
+      {/* RECENT TABLE */}
+      <div style={Card()}>
+        <div style={{fontWeight:800,color:C.navy,marginBottom:16,fontSize:14}}>
+          🕐 Recent Submissions
+        </div>
+        {vis.length===0
+          ? <Empty msg='No records yet' sub='Start by adding your first research entry!'/>
+          : <RecTable rows={[...vis].reverse().slice(0,7)} mini/>
+        }
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//  ADD RECORD
+// ══════════════════════════════════════════════════════════════════════════
+function PageAdd({user,setRecs,notify}) {
+  const [type,setType] = useState('journal');
+  const [form,setForm] = useState({});
+  const [busy,setBusy] = useState(false);
+  const upd = (k,v) => setForm(f=>({...f,[k]:v}));
+  const cat = catOf(type);
+
+  const submit = async () => {
+    const miss = (FIELDS[type]||[]).filter(f=>f.req&&!form[f.n]);
+    if (miss.length) return notify(`Required: ${miss.map(f=>f.l).join(', ')}`, 'err');
+    setBusy(true);
+    try {
+      const r = await api('addRecord',{userId:user.id, type, data:form});
+      setRecs(prev=>[...prev, r.record]);
+      setForm({});
+      notify('Record submitted! Awaiting approval.');
+    } catch(e) { notify(e.message,'err'); }
+    setBusy(false);
+  };
+
+  return (
+    <div className="fadeUp">
+      <div style={{marginBottom:20}}>
+        <div style={{fontSize:18,fontWeight:900,color:C.navy}}>Add Research Record</div>
+        <div style={{color:C.muted,fontSize:13.5,marginTop:2}}>
+          Select a category, fill in details, then submit for approval
+        </div>
+      </div>
+
+      {/* Category pills */}
+      <div style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:22}}>
+        {CATS.map(c=>(
+          <button key={c.id} onClick={()=>{setType(c.id);setForm({});}}
+            style={{padding:'7px 15px',borderRadius:20,cursor:'pointer',fontWeight:700,
+              fontSize:13,transition:'all .15s',
+              border:`2px solid ${type===c.id?c.color:C.border}`,
+              background:type===c.id?c.color:'#fff',
+              color:type===c.id?'#fff':'#374151'}}>
+            {c.emoji} {c.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Form */}
+      <div style={{...Card(),borderTop:`4px solid ${cat.color}`}}>
+        <div style={{fontWeight:800,fontSize:15,color:cat.color,marginBottom:20}}>
+          {cat.emoji} {cat.label} — Entry Form
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(260px,1fr))',gap:16}}>
+          {(FIELDS[type]||[]).map(f=>(
+            <div key={f.n} style={{gridColumn:f.n==='title'||f.n==='coAuthors'?'1/-1':'auto'}}>
+              <label style={Lbl}>
+                {f.l}{f.req&&<span style={{color:C.red}}> *</span>}
+              </label>
+              {f.type==='sel' ? (
+                <select style={Inp()} value={form[f.n]||''}
+                  onChange={e=>upd(f.n,e.target.value)}>
+                  <option value=''>Select…</option>
+                  {f.opts.map(o=><option key={o}>{o}</option>)}
+                </select>
+              ) : (
+                <input style={Inp()} type={f.type||'text'} placeholder={f.ph||''}
+                  value={form[f.n]||''} onChange={e=>upd(f.n,e.target.value)}/>
+              )}
+            </div>
+          ))}
+        </div>
+        <div style={{marginTop:22,display:'flex',gap:12,paddingTop:18,
+          borderTop:`1px solid ${C.border}`}}>
+          <button style={Btn(cat.color,'#fff',{padding:'11px 28px',fontSize:14})}
+            onClick={submit} disabled={busy}>
+            {busy?<><Spin/>&nbsp;Saving…</>:'💾 Submit Record'}
+          </button>
+          <button style={Btn('#F1F5F9','#475569',{padding:'11px 20px',fontSize:14})}
+            onClick={()=>setForm({})}>
+            🔄 Clear Form
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//  RECORDS (My + All)
+// ══════════════════════════════════════════════════════════════════════════
+function PageRecs({user,recs,setRecs,notify,mode}) {
+  const [search,  setSrch]  = useState('');
+  const [fType,   setFType] = useState('');
+  const [fSchool, setFSch]  = useState(user.role==='schoolHead'?user.school:'');
+  const [fYear,   setFYear] = useState('');
+  const [fStatus, setFStat] = useState('');
+  const [editRec, setEdit]  = useState(null);   // record being edited
+  const [busyId,  setBusy]  = useState(null);
+
+  let vis = mode==='my'              ? recs.filter(r=>r.userId===user.id)
+          : user.role==='schoolHead' ? recs.filter(r=>r.school===user.school)
+          : recs;
+  if (fType)   vis=vis.filter(r=>r.type===fType);
+  if (fSchool) vis=vis.filter(r=>r.school===fSchool);
+  if (fStatus) vis=vis.filter(r=>r.approvalStatus===fStatus);
+  if (fYear)   vis=vis.filter(r=>{
+    const d=r.data?.publishDate||r.data?.filingDate||r.createdAt;
+    return d?.startsWith(fYear);
+  });
+  if (search) {
+    const q=search.toLowerCase();
+    vis=vis.filter(r=>
+      r.data?.title?.toLowerCase().includes(q)||
+      r.authorName?.toLowerCase().includes(q)||
+      r.data?.journalName?.toLowerCase().includes(q)||
+      r.data?.conferenceName?.toLowerCase().includes(q)
+    );
+  }
+
+  const unique = dedup(vis);
+
+  const del = async id => {
+    if (!confirm('Delete this record? This cannot be undone.')) return;
+    setBusy(id);
+    try {
+      await api('deleteRecord',{userId:user.id,recordId:id});
+      setRecs(prev=>prev.filter(r=>r.id!==id));
+      notify('Record deleted.');
+    } catch(e) { notify(e.message,'err'); }
+    setBusy(null);
+  };
+
+  return (
+    <div className="fadeUp">
+      {/* Edit modal */}
+      {editRec && (
+        <EditModal rec={editRec} user={user}
+          onClose={()=>setEdit(null)}
+          onSave={async (id,data)=>{
+            setBusy(id);
+            try {
+              await api('updateRecord',{userId:user.id,recordId:id,data});
+              setRecs(prev=>prev.map(r=>r.id===id
+                ?{...r,data,approvalStatus:'pending',approvedBy:'',approvedAt:''}:r));
+              setEdit(null); notify('Record updated — resubmitted for approval.');
+            } catch(e) { notify(e.message,'err'); }
+            setBusy(null);
+          }}/>
+      )}
+
+      <div style={{display:'flex',justifyContent:'space-between',
+        alignItems:'flex-start',marginBottom:18,flexWrap:'wrap',gap:12}}>
+        <div>
+          <div style={{fontSize:18,fontWeight:900,color:C.navy}}>
+            {mode==='my'?'My Records':'All Records'}
+          </div>
+          <div style={{color:C.muted,fontSize:13,marginTop:2}}>
+            {vis.length} records &nbsp;·&nbsp;
+            <span style={{color:C.green,fontWeight:700}}>{unique.length} unique contributions</span>
+          </div>
+        </div>
+        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+          <button style={Btn(C.green,'#fff')}
+            onClick={()=>exportCSV(buildExportRows(vis),`IILM_All_${Date.now()}.csv`)}>
+            📥 Export All
+          </button>
+          {mode!=='my' && (
+            <button style={Btn(C.gold,'#5a3800')}
+              onClick={()=>exportCSV(buildExportRows(unique),`IILM_Unique_${Date.now()}.csv`)}>
+              📥 Unique Only
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div style={{...Card(),marginBottom:16}}>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(170px,1fr))',gap:12}}>
+          <input style={Inp()} placeholder='🔍 Search title, author…'
+            value={search} onChange={e=>setSrch(e.target.value)}/>
+          <select style={Inp()} value={fType} onChange={e=>setFType(e.target.value)}>
+            <option value=''>All Types</option>
+            {CATS.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}
+          </select>
+          {mode!=='my' && user.role!=='schoolHead' && (
+            <select style={Inp()} value={fSchool} onChange={e=>setFSch(e.target.value)}>
+              <option value=''>All Schools</option>
+              {SCHOOLS.map(s=><option key={s}>{s}</option>)}
+            </select>
+          )}
+          <select style={Inp()} value={fStatus} onChange={e=>setFStat(e.target.value)}>
+            <option value=''>All Statuses</option>
+            <option value='pending'>Pending</option>
+            <option value='approved'>Approved</option>
+            <option value='rejected'>Rejected</option>
+          </select>
+          <input style={Inp()} type='number' placeholder='Year e.g. 2023'
+            value={fYear} onChange={e=>setFYear(e.target.value)} min='2000' max='2030'/>
+        </div>
+      </div>
+
+      <div style={Card()}>
+        <RecTable rows={vis} user={user} onDelete={del}
+          onEdit={setEdit} busyId={busyId} showAuthor={mode!=='my'}/>
+      </div>
+    </div>
+  );
+}
+
+// ── Edit Modal ──────────────────────────────────────────────────────────
+function EditModal({rec, user, onClose, onSave}) {
+  const [form,setForm] = useState({...rec.data});
+  const [busy,setBusy] = useState(false);
+  const upd = (k,v) => setForm(f=>({...f,[k]:v}));
+  const cat = catOf(rec.type);
+
+  const save = async () => {
+    const miss=(FIELDS[rec.type]||[]).filter(f=>f.req&&!form[f.n]);
+    if(miss.length) return alert(`Required: ${miss.map(f=>f.l).join(', ')}`);
+    setBusy(true);
+    await onSave(rec.id, form);
+    setBusy(false);
+  };
+
+  return (
+    <div style={{position:'fixed',inset:0,zIndex:1000,
+      background:'rgba(7,19,55,0.72)',display:'flex',
+      alignItems:'center',justifyContent:'center',padding:20}}>
+      <div style={{background:'#fff',borderRadius:16,width:'100%',maxWidth:680,
+        maxHeight:'88vh',overflow:'auto',boxShadow:'0 24px 80px rgba(0,0,0,0.4)'}}>
+        <div style={{padding:'20px 24px',borderBottom:`1px solid ${C.border}`,
+          display:'flex',justifyContent:'space-between',alignItems:'center',
+          position:'sticky',top:0,background:'#fff',zIndex:1}}>
+          <div style={{fontWeight:800,fontSize:15,color:cat.color}}>
+            {cat.emoji} Edit — {cat.label}
+          </div>
+          <button onClick={onClose}
+            style={{...Btn('#F1F5F9','#475569',{padding:'6px 12px',fontSize:12})}}>
+            ✕ Cancel
+          </button>
+        </div>
+        <div style={{padding:24}}>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(250px,1fr))',gap:14}}>
+            {(FIELDS[rec.type]||[]).map(f=>(
+              <div key={f.n} style={{gridColumn:f.n==='title'||f.n==='coAuthors'?'1/-1':'auto'}}>
+                <label style={Lbl}>{f.l}{f.req&&<span style={{color:C.red}}> *</span>}</label>
+                {f.type==='sel'
+                  ? <select style={Inp()} value={form[f.n]||''} onChange={e=>upd(f.n,e.target.value)}>
+                      <option value=''>Select…</option>
+                      {f.opts.map(o=><option key={o}>{o}</option>)}
+                    </select>
+                  : <input style={Inp()} type={f.type||'text'} placeholder={f.ph||''}
+                      value={form[f.n]||''} onChange={e=>upd(f.n,e.target.value)}/>
+                }
+              </div>
+            ))}
+          </div>
+          <div style={{marginTop:20,display:'flex',gap:10,paddingTop:18,
+            borderTop:`1px solid ${C.border}`}}>
+            <button style={Btn(cat.color,'#fff',{padding:'10px 24px'})}
+              onClick={save} disabled={busy}>
+              {busy?<><Spin/>&nbsp;Saving…</>:'💾 Save Changes'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//  ANALYTICS
+// ══════════════════════════════════════════════════════════════════════════
+function PageAnaly({user,recs}) {
+  const [fs,setFs] = useState(user.role==='schoolHead'?user.school:'');
+  const [fy,setFy] = useState('');
+
+  let d = user.role==='user'       ? recs.filter(r=>r.userId===user.id)
+        : user.role==='schoolHead' ? recs.filter(r=>r.school===user.school)
+        : recs;
+  if (fs) d=d.filter(r=>r.school===fs);
+  if (fy) d=d.filter(r=>{
+    const dt=r.data?.publishDate||r.data?.filingDate||r.createdAt;
+    return dt?.startsWith(fy);
+  });
+
+  const catData  = CATS.map(c=>({
+    name:c.label.replace(' Paper','').replace('Authored ','').replace('Edited ',''),
+    value:d.filter(r=>r.type===c.id).length, color:c.color
+  })).filter(x=>x.value>0);
+
+  const yearData = (()=>{
+    const m={};
+    d.forEach(r=>{const dt=r.data?.publishDate||r.data?.filingDate||r.createdAt;
+      if(dt){const y=dt.slice(0,4);m[y]=(m[y]||0)+1;}});
+    return Object.entries(m).sort().map(([y,v])=>({year:y,count:v}));
+  })();
+
+  const idxData = (()=>{
+    const m={};
+    d.filter(r=>r.data?.indexing).forEach(r=>{m[r.data.indexing]=(m[r.data.indexing]||0)+1;});
+    return Object.entries(m).map(([name,value])=>({name,value}));
+  })();
+
+  const schData = (()=>{
+    const m={};
+    d.forEach(r=>{if(r.school)m[r.school]=(m[r.school]||0)+1;});
+    return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,8)
+      .map(([name,count])=>({name:name.replace('School of ',''),count}));
+  })();
+
+  const statusData=[
+    {name:'Approved',value:d.filter(r=>r.approvalStatus==='approved').length,color:C.green},
+    {name:'Pending', value:d.filter(r=>r.approvalStatus==='pending').length, color:'#D97706'},
+    {name:'Rejected',value:d.filter(r=>r.approvalStatus==='rejected').length,color:C.red},
+  ].filter(x=>x.value>0);
+
+  return (
+    <div className="fadeUp">
+      <div style={{marginBottom:20}}>
+        <div style={{fontSize:18,fontWeight:900,color:C.navy}}>Research Analytics</div>
+        <div style={{color:C.muted,fontSize:13.5,marginTop:2}}>
+          Insights based on {d.length} record{d.length!==1?'s':''}
+        </div>
+      </div>
+
+      {/* Filters */}
+      {user.role!=='user' && (
+        <div style={{...Card(),marginBottom:18}}>
+          <div style={{display:'flex',gap:12,flexWrap:'wrap',alignItems:'center'}}>
+            {user.role!=='schoolHead' && (
+              <select style={{...Inp(),maxWidth:320}} value={fs} onChange={e=>setFs(e.target.value)}>
+                <option value=''>All Schools</option>
+                {SCHOOLS.map(s=><option key={s}>{s}</option>)}
+              </select>
+            )}
+            <input style={{...Inp(),maxWidth:170}} type='number' placeholder='Filter by Year'
+              value={fy} onChange={e=>setFy(e.target.value)} min='2000' max='2030'/>
+          </div>
+        </div>
+      )}
+
+      {/* Category mini cards */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(128px,1fr))',
+        gap:10,marginBottom:18}}>
+        {CATS.map(c=>(
+          <div key={c.id} style={{background:'#fff',borderRadius:10,padding:'12px 14px',
+            borderTop:`3px solid ${c.color}`,boxShadow:'0 1px 5px rgba(11,31,75,0.07)'}}>
+            <div style={{fontSize:20}}>{c.emoji}</div>
+            <div style={{fontSize:22,fontWeight:900,color:c.color}}>
+              {d.filter(r=>r.type===c.id).length}
+            </div>
+            <div style={{fontSize:11,color:C.muted,marginTop:2,lineHeight:1.3}}>{c.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {d.length===0
+        ? <div style={{...Card(),padding:60,textAlign:'center'}}>
+            <Empty msg='No data for selected filters'/>
+          </div>
+        : (
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+            {catData.length>0 && (
+              <div style={Card()}>
+                <div style={{fontWeight:800,color:C.navy,marginBottom:14,fontSize:14}}>
+                  Research Distribution
+                </div>
+                <ResponsiveContainer width='100%' height={220}>
+                  <PieChart>
+                    <Pie data={catData} dataKey='value' nameKey='name'
+                      cx='50%' cy='50%' outerRadius={85}
+                      label={({name,percent})=>`${name} ${(percent*100).toFixed(0)}%`}
+                      labelLine={false} fontSize={10}>
+                      {catData.map((c,i)=><Cell key={i} fill={c.color}/>)}
+                    </Pie>
+                    <Tooltip/>
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+
+            {yearData.length>0 && (
+              <div style={Card()}>
+                <div style={{fontWeight:800,color:C.navy,marginBottom:14,fontSize:14}}>
+                  Year-wise Publications
+                </div>
+                <ResponsiveContainer width='100%' height={220}>
+                  <BarChart data={yearData}>
+                    <CartesianGrid strokeDasharray='3 3' opacity={0.15}/>
+                    <XAxis dataKey='year' tick={{fontSize:12}}/>
+                    <YAxis tick={{fontSize:11}}/>
+                    <Tooltip/>
+                    <Bar dataKey='count' fill={C.navy} name='Publications' radius={[5,5,0,0]}/>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+
+            {idxData.length>0 && (
+              <div style={Card()}>
+                <div style={{fontWeight:800,color:C.navy,marginBottom:14,fontSize:14}}>
+                  Indexing Breakdown
+                </div>
+                <ResponsiveContainer width='100%' height={220}>
+                  <BarChart data={idxData} layout='vertical'>
+                    <CartesianGrid strokeDasharray='3 3' opacity={0.15}/>
+                    <XAxis type='number' tick={{fontSize:11}}/>
+                    <YAxis dataKey='name' type='category' tick={{fontSize:11}} width={76}/>
+                    <Tooltip/>
+                    <Bar dataKey='value' name='Count' radius={[0,5,5,0]}>
+                      {idxData.map((_,i)=><Cell key={i} fill={PALETTE[i%PALETTE.length]}/>)}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+
+            {schData.length>1 && (
+              <div style={Card()}>
+                <div style={{fontWeight:800,color:C.navy,marginBottom:14,fontSize:14}}>
+                  School-wise Contributions
+                </div>
+                <ResponsiveContainer width='100%' height={220}>
+                  <BarChart data={schData} layout='vertical'>
+                    <CartesianGrid strokeDasharray='3 3' opacity={0.15}/>
+                    <XAxis type='number' tick={{fontSize:11}}/>
+                    <YAxis dataKey='name' type='category' tick={{fontSize:10}} width={88}/>
+                    <Tooltip/>
+                    <Bar dataKey='count' fill={C.red} name='Count' radius={[0,5,5,0]}/>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+
+            {statusData.length>0 && (
+              <div style={Card()}>
+                <div style={{fontWeight:800,color:C.navy,marginBottom:14,fontSize:14}}>
+                  Approval Status
+                </div>
+                <ResponsiveContainer width='100%' height={220}>
+                  <PieChart>
+                    <Pie data={statusData} dataKey='value' nameKey='name'
+                      cx='50%' cy='50%' outerRadius={85}
+                      label={({name,percent})=>`${name} ${(percent*100).toFixed(0)}%`}
+                      labelLine={false} fontSize={11}>
+                      {statusData.map((d,i)=><Cell key={i} fill={d.color}/>)}
+                    </Pie>
+                    <Tooltip/>
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+        )
+      }
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//  APPROVALS
+// ══════════════════════════════════════════════════════════════════════════
+function PageApprove({user,recs,setRecs,notify}) {
+  const [busyId,setBusy] = useState(null);
+  const [filter,setFilter] = useState(user.role==='schoolHead'?user.school:'');
+
+  let pending = recs.filter(r=>{
+    if (r.approvalStatus!=='pending') return false;
+    if (user.role==='admin'||user.role==='universityHead') return true;
+    return user.role==='schoolHead' && r.school===user.school;
+  });
+  if (filter && user.role!=='schoolHead') pending=pending.filter(r=>r.school===filter);
+
+  const decide = async (id, status) => {
+    setBusy(id);
+    try {
+      await api('approveRecord',{userId:user.id,recordId:id,status});
+      setRecs(prev=>prev.map(r=>r.id===id
+        ?{...r,approvalStatus:status,approvedBy:user.name,approvedAt:new Date().toISOString()}
+        :r));
+      notify(status==='approved'?'Record approved ✅':'Record rejected ❌');
+    } catch(e) { notify(e.message,'err'); }
+    setBusy(null);
+  };
+
+  const decided = recs.filter(r=>r.approvedBy).reverse().slice(0,8);
+
+  return (
+    <div className="fadeUp">
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',
+        marginBottom:20,flexWrap:'wrap',gap:12}}>
+        <div>
+          <div style={{fontSize:18,fontWeight:900,color:C.navy}}>Approval Queue</div>
+          <div style={{color:C.muted,fontSize:13.5,marginTop:2}}>
+            {pending.length} record{pending.length!==1?'s':''} awaiting your review
+          </div>
+        </div>
+        {(user.role==='admin'||user.role==='universityHead') && (
+          <select style={{...Inp(),maxWidth:300}} value={filter} onChange={e=>setFilter(e.target.value)}>
+            <option value=''>All Schools</option>
+            {SCHOOLS.map(s=><option key={s}>{s}</option>)}
+          </select>
+        )}
+      </div>
+
+      {pending.length===0 ? (
+        <div style={{...Card(),textAlign:'center',padding:60}}>
+          <div style={{fontSize:52,marginBottom:12}}>✅</div>
+          <div style={{color:C.muted,fontWeight:600}}>All clear! Nothing pending.</div>
+        </div>
+      ) : (
+        <div style={{display:'flex',flexDirection:'column',gap:12,marginBottom:20}}>
+          {pending.map(r=>(
+            <div key={r.id} style={{...Card(),borderLeft:`5px solid ${catOf(r.type).color}`}}>
+              <div style={{display:'flex',justifyContent:'space-between',
+                alignItems:'flex-start',flexWrap:'wrap',gap:12}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:8,flexWrap:'wrap'}}>
+                    <span style={{background:catOf(r.type).color+'15',color:catOf(r.type).color,
+                      padding:'3px 10px',borderRadius:12,fontSize:12,fontWeight:700}}>
+                      {catOf(r.type).emoji} {catOf(r.type).label}
+                    </span>
+                    <span style={{color:C.muted,fontSize:12}}>{r.createdAt?.slice(0,10)}</span>
+                  </div>
+                  <div style={{fontWeight:700,fontSize:15,marginBottom:5,color:C.text}}>
+                    {r.data?.title||'—'}
+                  </div>
+                  <div style={{fontSize:13,color:C.muted,display:'flex',gap:18,flexWrap:'wrap'}}>
+                    <span>👤 {r.authorName}</span>
+                    <span>🏫 {r.school?.replace('School of ','')}</span>
+                    <span>📋 {r.designation}</span>
+                  </div>
+                  <div style={{marginTop:7,display:'flex',flexWrap:'wrap',gap:16,fontSize:12}}>
+                    {r.data?.indexing   && <span>📊 Indexing: <strong>{r.data.indexing}</strong></span>}
+                    {r.data?.publishDate&& <span>📅 {r.data.publishDate}</span>}
+                    {r.data?.doi        && <span>🔗 DOI: {r.data.doi}</span>}
+                    {r.data?.isbnIssn   && <span>📕 {r.data.isbnIssn}</span>}
+                  </div>
+                  {r.data?.driveLink && (
+                    <a href={r.data.driveLink} target='_blank' rel='noreferrer'
+                      style={{fontSize:12,color:C.navy,fontWeight:600,
+                        display:'inline-flex',alignItems:'center',gap:4,marginTop:6}}>
+                      📎 View Proof Document ↗
+                    </a>
+                  )}
+                </div>
+                <div style={{display:'flex',gap:8,flexShrink:0,alignItems:'flex-start'}}>
+                  <button style={Btn('#D1FAE5','#065F46',{padding:'10px 20px',fontWeight:800})}
+                    onClick={()=>decide(r.id,'approved')} disabled={busyId===r.id}>
+                    {busyId===r.id?<Spin/>:'✅ Approve'}
+                  </button>
+                  <button style={Btn('#FEE2E2','#991B1B',{padding:'10px 20px',fontWeight:800})}
+                    onClick={()=>decide(r.id,'rejected')} disabled={busyId===r.id}>
+                    ❌ Reject
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {decided.length>0 && (
+        <div style={Card()}>
+          <div style={{fontWeight:800,color:C.navy,marginBottom:14,fontSize:14}}>
+            Recently Reviewed
+          </div>
+          {decided.map(r=>(
+            <div key={r.id} style={{display:'flex',gap:12,alignItems:'center',
+              padding:'9px 12px',borderRadius:8,background:C.bg,
+              fontSize:13,marginBottom:6}}>
+              <StatusBadge s={r.approvalStatus}/>
+              <span style={{fontWeight:600,flex:1,overflow:'hidden',
+                textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                {r.data?.title||'—'}
+              </span>
+              <span style={{color:C.muted,fontSize:11,whiteSpace:'nowrap'}}>
+                by {r.approvedBy}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//  ADMIN
+// ══════════════════════════════════════════════════════════════════════════
+function PageAdmin({user,users,recs,setUsers,notify}) {
+  const [q,      setQ]    = useState('');
+  const [busyId, setBusy] = useState(null);
+  const filt = users.filter(u=>
+    u.name?.toLowerCase().includes(q.toLowerCase())||
+    u.email?.toLowerCase().includes(q.toLowerCase())
+  );
+
+  const updRole = async (id,role) => {
+    setBusy(id);
+    try {
+      await api('updateRole',{userId:user.id,targetId:id,role});
+      setUsers(prev=>prev.map(u=>u.id===id?{...u,role}:u));
+      notify(`Role updated to ${RLBL[role]}`);
+    } catch(e) { notify(e.message,'err'); }
+    setBusy(null);
+  };
+
+  const delUser = async id => {
+    if (!confirm('Delete user and all associated data? This cannot be undone.')) return;
+    setBusy(id);
+    try {
+      await api('deleteUser',{userId:user.id,targetId:id});
+      setUsers(prev=>prev.filter(u=>u.id!==id));
+      notify('User removed.');
+    } catch(e) { notify(e.message,'err'); }
+    setBusy(null);
+  };
+
+  const STATS=[
+    {l:'Total Users',   v:users.length,                                        i:'👥',c:C.navy},
+    {l:'Total Records', v:recs.length,                                          i:'📋',c:'#7C3AED'},
+    {l:'Approved',      v:recs.filter(r=>r.approvalStatus==='approved').length, i:'✅',c:C.green},
+    {l:'Pending',       v:recs.filter(r=>r.approvalStatus==='pending').length,  i:'⏳',c:C.gold},
+    {l:'School Heads',  v:users.filter(u=>u.role==='schoolHead').length,        i:'🏫',c:C.red},
+  ];
+
+  return (
+    <div className="fadeUp">
+      <div style={{fontSize:18,fontWeight:900,color:C.navy,marginBottom:20}}>Admin Panel</div>
+
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(155px,1fr))',
+        gap:12,marginBottom:20}}>
+        {STATS.map(s=>(
+          <div key={s.l} style={{...Card(),borderLeft:`4px solid ${s.c}`}}>
+            <div style={{fontSize:24}}>{s.i}</div>
+            <div style={{fontSize:28,fontWeight:900,color:s.c}}>{s.v}</div>
+            <div style={{fontSize:12,color:C.muted,fontWeight:600,marginTop:3}}>{s.l}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={Card()}>
+        <div style={{display:'flex',justifyContent:'space-between',
+          alignItems:'center',marginBottom:16,flexWrap:'wrap',gap:12}}>
+          <div style={{fontWeight:800,color:C.navy,fontSize:14}}>
+            User Management ({filt.length})
+          </div>
+          <input style={{...Inp(),width:240}} placeholder='🔍 Search users…'
+            value={q} onChange={e=>setQ(e.target.value)}/>
+        </div>
+        <div style={{overflowX:'auto'}}>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+            <thead>
+              <tr style={{borderBottom:`2px solid ${C.border}`}}>
+                {['Name','Email','School','Emp. Code','Designation','Role','Records','Actions']
+                  .map(h=>(
+                  <th key={h} style={{padding:'9px 12px',textAlign:'left',fontWeight:700,
+                    color:C.navy,whiteSpace:'nowrap',fontSize:11.5,
+                    textTransform:'uppercase',letterSpacing:'.04em'}}>
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filt.map(u=>(
+                <tr key={u.id} className='rh' style={{borderBottom:`1px solid ${C.border}`}}>
+                  <td style={{padding:'10px 12px',fontWeight:600}}>{u.name}</td>
+                  <td style={{padding:'10px 12px',color:C.muted,fontSize:12}}>{u.email}</td>
+                  <td style={{padding:'10px 12px',fontSize:12,maxWidth:130,overflow:'hidden',
+                    textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                    {u.school?.replace('School of ','')||'—'}
+                  </td>
+                  <td style={{padding:'10px 12px',fontSize:12}}>{u.employeeCode||'—'}</td>
+                  <td style={{padding:'10px 12px',fontSize:12}}>{u.designation||'—'}</td>
+                  <td style={{padding:'10px 12px'}}>
+                    <select value={u.role||'user'}
+                      disabled={u.id===user.id||busyId===u.id}
+                      onChange={e=>updRole(u.id,e.target.value)}
+                      style={{...Inp(),padding:'5px 8px',fontSize:12,width:'auto'}}>
+                      <option value='user'>Faculty</option>
+                      <option value='schoolHead'>School Head</option>
+                      <option value='universityHead'>University Head</option>
+                      <option value='admin'>Admin</option>
+                    </select>
+                  </td>
+                  <td style={{padding:'10px 12px',textAlign:'center'}}>
+                    <span style={{background:C.navy+'15',color:C.navy,padding:'3px 10px',
+                      borderRadius:12,fontSize:12,fontWeight:700}}>
+                      {recs.filter(r=>r.userId===u.id).length}
+                    </span>
+                  </td>
+                  <td style={{padding:'10px 12px'}}>
+                    {u.id!==user.id && (
+                      <button style={Btn('#FEF2F2',C.red,{padding:'5px 11px',fontSize:11})}
+                        onClick={()=>delUser(u.id)} disabled={busyId===u.id}>
+                        {busyId===u.id?<Spin/>:'🗑️'}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//  SHARED TABLE
+// ══════════════════════════════════════════════════════════════════════════
+function RecTable({rows, user, onDelete, onEdit, busyId, showAuthor, mini}) {
+  const [exp,setExp] = useState(null);
+  if (!rows||rows.length===0) return <Empty msg='No records found'/>;
+
+  return (
+    <div style={{overflowX:'auto'}}>
+      <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+        <thead>
+          <tr style={{borderBottom:`2px solid ${C.border}`}}>
+            {['Type','Title',showAuthor&&'Author','Date','Status',!mini&&'Actions']
+              .filter(Boolean).map(h=>(
+              <th key={h} style={{padding:'9px 12px',textAlign:'left',fontWeight:700,
+                color:C.navy,fontSize:11.5,textTransform:'uppercase',
+                letterSpacing:'.04em',whiteSpace:'nowrap'}}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(r=>(
+            <Fragment key={r.id}>
+              <tr className='rh' style={{borderBottom:`1px solid ${C.border}`,cursor:'pointer'}}
+                onClick={()=>!mini&&setExp(exp===r.id?null:r.id)}>
+                <td style={{padding:'10px 12px'}}>
+                  <span style={{background:catOf(r.type).color+'18',
+                    color:catOf(r.type).color,padding:'3px 9px',
+                    borderRadius:12,fontSize:11.5,fontWeight:700,whiteSpace:'nowrap'}}>
+                    {catOf(r.type).emoji} {catOf(r.type).label}
+                  </span>
+                </td>
+                <td style={{padding:'10px 12px',maxWidth:220,overflow:'hidden',
+                  textOverflow:'ellipsis',whiteSpace:'nowrap',fontWeight:500}}>
+                  {r.data?.title||'—'}
+                </td>
+                {showAuthor&&(
+                  <td style={{padding:'10px 12px',color:C.muted,whiteSpace:'nowrap'}}>
+                    {r.authorName}
+                  </td>
+                )}
+                <td style={{padding:'10px 12px',color:C.muted,fontSize:12,whiteSpace:'nowrap'}}>
+                  {r.data?.publishDate||r.data?.filingDate||r.createdAt?.slice(0,10)||'—'}
+                </td>
+                <td style={{padding:'10px 12px'}}><StatusBadge s={r.approvalStatus}/></td>
+                {!mini && (
+                  <td style={{padding:'10px 12px'}}>
+                    <div style={{display:'flex',gap:5,flexWrap:'nowrap'}}>
+                      <button style={Btn('#EFF6FF',C.navy,{padding:'4px 9px',fontSize:11})}
+                        onClick={e=>{e.stopPropagation();setExp(exp===r.id?null:r.id);}}>
+                        {exp===r.id?'▲':'▼'}
+                      </button>
+                      {r.data?.driveLink && (
+                        <a href={r.data.driveLink} target='_blank' rel='noreferrer'
+                          onClick={e=>e.stopPropagation()}
+                          style={{...Btn('#F0FDF4',C.green,{padding:'4px 9px',fontSize:11})}}>
+                          🔗
+                        </a>
+                      )}
+                      {(user?.id===r.userId||user?.role==='admin') && onEdit && r.approvalStatus!=='approved' && (
+                        <button style={Btn('#FFF7ED','#C2410C',{padding:'4px 9px',fontSize:11})}
+                          onClick={e=>{e.stopPropagation();onEdit(r);}}>
+                          ✏️
+                        </button>
+                      )}
+                      {(user?.id===r.userId||user?.role==='admin') && onDelete && (
+                        <button style={Btn('#FEF2F2',C.red,{padding:'4px 9px',fontSize:11})}
+                          onClick={e=>{e.stopPropagation();onDelete(r.id);}}
+                          disabled={busyId===r.id}>
+                          {busyId===r.id?<Spin/>:'🗑️'}
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                )}
+              </tr>
+              {/* Expanded detail row */}
+              {exp===r.id && (
+                <tr>
+                  <td colSpan={10} style={{background:'#F8FAFF',padding:'16px 20px',
+                    borderBottom:`2px solid ${C.border}`}}>
+                    <div style={{display:'grid',
+                      gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:8,fontSize:12}}>
+                      <div style={{background:'#fff',padding:'8px 12px',borderRadius:7,
+                        border:`1px solid ${C.border}`,gridColumn:'1/-1'}}>
+                        <div style={{...Lbl,marginBottom:4}}>Author Info</div>
+                        <div style={{fontWeight:500}}>
+                          {r.authorName} &nbsp;·&nbsp; {r.school} &nbsp;·&nbsp; {r.designation}
+                        </div>
+                      </div>
+                      {Object.entries(r.data||{}).filter(([,v])=>v).map(([k,v])=>(
+                        <div key={k} style={{background:'#fff',padding:'8px 12px',
+                          borderRadius:7,border:`1px solid ${C.border}`}}>
+                          <div style={{...Lbl,marginBottom:3,fontSize:10}}>
+                            {k.replace(/([A-Z])/g,' $1').trim()}
+                          </div>
+                          <div style={{fontWeight:500,color:C.text,wordBreak:'break-word'}}>
+                            {k==='driveLink'
+                              ? <a href={v} target='_blank' rel='noreferrer'
+                                  style={{color:C.navy,fontWeight:600}}>View Proof ↗</a>
+                              : v}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </Fragment>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ── MOUNT ─────────────────────────────────────────────────────────────────
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App/>);
+</script>
+</body>
+</html>
